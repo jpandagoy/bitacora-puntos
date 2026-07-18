@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#14284B">
+<title>Bitácora de Puntos · Quito</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root{
+    --navy:#14284B;--navy2:#1F3864;--gold:#F2B705;--gold2:#FFD54A;
+    --ink:#0E1726;--slate:#5A6B85;--line:#E4E8F0;--bg:#EEF1F6;--card:#fff;
+    --green:#1B9A6B;--amber:#E08A00;--red:#B4381F;
+    --sheet-h: 0px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overscroll-behavior:none}
+  body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);
+    display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+  button{font-family:inherit;cursor:pointer;border:none;background:none}
+  .hidden{display:none!important}
+
+  /* App bar */
+  .appbar{background:var(--navy);color:#fff;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
+    display:flex;align-items:center;gap:10px;flex:none;z-index:20}
+  .appbar .logo{width:30px;height:30px;border-radius:8px;background:var(--gold);color:var(--navy);
+    font-weight:900;display:grid;place-items:center;flex:none}
+  .appbar .tt{font-weight:800;font-size:15px;line-height:1.05}
+  .appbar .ss{font-size:11px;color:#A9BBDA}
+  .appbar .gps{margin-left:auto;font-size:10.5px;font-weight:700;color:#A9BBDA;display:flex;align-items:center;gap:6px}
+  .gps .led{width:8px;height:8px;border-radius:50%;background:#556;transition:.3s}
+  .gps.on .led{background:#39d98a;box-shadow:0 0 0 3px rgba(57,217,138,.25)}
+
+  /* Views */
+  .views{flex:1;position:relative;overflow:hidden}
+  .view{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 84px}
+  .view.map-view{padding:0}
+  #map{position:absolute;inset:0}
+
+  /* Progress strip */
+  .prog{position:absolute;top:10px;left:10px;right:10px;z-index:400;background:#fff;border-radius:12px;
+    box-shadow:0 6px 18px -8px rgba(20,40,75,.45);padding:9px 12px;display:flex;align-items:center;gap:10px}
+  .prog .bar{flex:1;height:7px;background:var(--line);border-radius:6px;overflow:hidden}
+  .prog .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--green),#2fbf87);width:0;transition:.4s}
+  .prog .txt{font-size:11px;font-weight:800;color:var(--navy2);white-space:nowrap}
+
+  /* Search + filters (list) */
+  .search{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:14px;width:100%;
+    color:var(--ink);margin-bottom:10px}
+  .search::placeholder{color:var(--slate)}
+  .filters{display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap}
+  .fchip{font-size:12px;font-weight:700;padding:7px 12px;border-radius:20px;border:1px solid var(--line);
+    background:#fff;color:var(--slate)}
+  .fchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+
+  /* Point item */
+  .item{background:#fff;border:1px solid var(--line);border-radius:13px;padding:11px 12px;margin-bottom:9px;
+    display:flex;align-items:center;gap:11px}
+  .dot{width:11px;height:11px;border-radius:50%;flex:none}
+  .dot.pendiente{background:var(--amber)}.dot.visitado{background:var(--green)}.dot.novedad{background:var(--red)}
+  .item .nm{font-size:14px;font-weight:700;line-height:1.15}
+  .item .ad{font-size:11.5px;color:var(--slate);margin-top:2px;line-height:1.25}
+  .item .rt{margin-left:auto;text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+  .item .km{font-size:11px;font-weight:800;color:var(--navy2)}
+  .goSm{background:var(--navy);color:#fff;font-size:11px;font-weight:800;border-radius:9px;padding:7px 11px;display:flex;align-items:center;gap:5px}
+  .goSm .pin{width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid var(--gold)}
+  .idx{position:absolute;left:-6px;top:-6px;width:20px;height:20px;border-radius:50%;background:var(--gold);color:var(--navy);
+    font-size:10px;font-weight:900;display:grid;place-items:center}
+
+  /* Section labels */
+  .lbl{font-size:11px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--slate);margin:6px 2px 9px}
+  .hint{font-size:12px;color:var(--slate);text-align:center;padding:24px 16px;line-height:1.5}
+
+  /* Ruta */
+  .route-hero{background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff;border-radius:16px;padding:15px;margin-bottom:12px}
+  .route-hero .rl{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--gold);font-weight:800}
+  .route-hero .rn{font-size:19px;font-weight:800;margin-top:4px}
+  .route-hero .meta{display:flex;gap:20px;margin-top:11px}
+  .route-hero .meta b{display:block;font-size:17px}
+  .route-hero .meta span{font-size:11px;color:#A9BBDA}
+  .btn{display:block;width:100%;text-align:center;font-weight:800;border-radius:12px;padding:13px;font-size:14px}
+  .btn-gold{background:var(--gold);color:var(--navy)}
+  .btn-navy{background:var(--navy);color:#fff}
+  .btn-green{background:var(--green);color:#fff}
+  .btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--line)}
+  .btn+.btn{margin-top:9px}
+
+  /* Bottom sheet (detail) */
+  .scrim{position:fixed;inset:0;background:rgba(8,16,30,.5);opacity:0;pointer-events:none;transition:.25s;z-index:900}
+  .scrim.show{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-radius:20px 20px 0 0;z-index:901;
+    transform:translateY(100%);transition:.3s cubic-bezier(.3,.8,.3,1);max-height:90dvh;display:flex;flex-direction:column;
+    box-shadow:0 -10px 40px -10px rgba(0,0,0,.4)}
+  .sheet.show{transform:translateY(0)}
+  .sheet .grab{width:40px;height:5px;background:#cbd3e0;border-radius:4px;margin:9px auto 4px}
+  .sheet-head{padding:6px 16px 12px;border-bottom:1px solid var(--line)}
+  .sheet-head .h{font-size:18px;font-weight:800}
+  .sheet-head .a{font-size:12.5px;color:var(--slate);margin-top:3px}
+  .sheet-body{overflow:auto;padding:14px 16px calc(env(safe-area-inset-bottom) + 20px)}
+
+  .statusrow{display:flex;gap:7px;margin-bottom:14px}
+  .st{flex:1;text-align:center;font-size:11.5px;font-weight:800;padding:9px 4px;border-radius:11px;border:1.5px solid var(--line);
+    background:#fff;color:var(--slate)}
+  .st.pendiente.on{background:var(--amber);border-color:var(--amber);color:#fff}
+  .st.visitado.on{background:var(--green);border-color:var(--green);color:#fff}
+  .st.novedad.on{background:var(--red);border-color:var(--red);color:#fff}
+
+  .act2{display:flex;gap:9px;margin-bottom:14px}
+  .act2 .btn{margin:0}
+
+  textarea.note{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px;font-size:14px;min-height:74px;
+    resize:vertical;font-family:inherit;background:#fff}
+  .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}
+  .tag{font-size:11.5px;font-weight:700;padding:6px 11px;border-radius:20px;border:1px solid var(--line);color:var(--slate);background:#fff}
+  .tag.on{background:var(--navy);border-color:var(--navy);color:#fff}
+
+  .photos{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+  .photos img{width:66px;height:66px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+  .photos .addph{width:66px;height:66px;border-radius:10px;border:1.5px dashed var(--slate);display:grid;place-items:center;
+    color:var(--slate);font-size:26px;font-weight:300;background:#fff}
+  .ph-wrap{position:relative}
+  .ph-wrap .del{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--red);color:#fff;
+    font-size:12px;font-weight:800;display:grid;place-items:center;border:2px solid var(--bg)}
+
+  .hist{background:#fff;border:1px solid var(--line);border-radius:12px;padding:4px 12px;margin-top:6px}
+  .hrow{display:flex;gap:10px;padding:10px 0;border-bottom:1px dashed var(--line)}
+  .hrow:last-child{border-bottom:0}
+  .hrow .when{font-size:11px;color:var(--slate);font-weight:700;width:78px;flex:none;line-height:1.3}
+  .hrow .what{font-size:13px;color:#233;line-height:1.4}
+  .hrow .what .st-in{font-weight:800}
+  .hrow .what .tg{font-size:10.5px;color:var(--navy2);font-weight:700}
+
+  /* Nearby suggestion popup */
+  .suggest{background:#fff;border:1.5px solid var(--gold);border-radius:14px;padding:12px;margin:2px 0 14px}
+  .suggest .sl{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);font-weight:800}
+  .suggest .snm{font-size:15px;font-weight:800;margin-top:3px}
+  .suggest .skm{font-size:12px;color:var(--slate);font-weight:700}
+
+  /* Tab bar */
+  .tabbar{flex:none;background:#fff;border-top:1px solid var(--line);display:flex;
+    padding:6px 4px calc(env(safe-area-inset-bottom) + 6px);z-index:20}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0;color:var(--slate);font-size:10.5px;font-weight:700}
+  .tab.on{color:var(--navy)}
+  .tab .ic{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .tab.on .ic{stroke:var(--navy)}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;
+    padding:11px 18px;border-radius:24px;font-size:13px;font-weight:700;opacity:0;transition:.25s;z-index:1000;pointer-events:none;
+    box-shadow:0 8px 24px -8px rgba(0,0,0,.5)}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* settings */
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+  .card h3{font-size:14px;margin:0 0 4px}
+  .card p{font-size:12px;color:var(--slate);margin:0 0 12px;line-height:1.5}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:12px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px;text-align:center}
+  .stat b{display:block;font-size:22px;color:var(--navy2)}
+  .stat span{font-size:11px;color:var(--slate);font-weight:700}
+  .leaflet-marker-icon.mk{border:none;background:none}
+  .mkp{width:26px;height:26px;transform:translate(-50%,-100%)}
+  .mkp i{display:block;width:22px;height:22px;margin:0 auto;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+    border:2.5px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.35)}
+  .me-dot{width:18px;height:18px;background:#2f7bff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(47,123,255,.3)}
+  .locate{position:absolute;right:12px;bottom:96px;z-index:450;width:46px;height:46px;border-radius:50%;background:#fff;
+    box-shadow:0 6px 16px -6px rgba(20,40,75,.5);display:grid;place-items:center}
+  .locate.on svg{stroke:#2f7bff}
+  .gps-cta{background:linear-gradient(135deg,var(--navy2),var(--navy));color:#fff;border-radius:16px;padding:20px 16px;text-align:center}
+  .gps-cta .ci{width:52px;height:52px;border-radius:50%;background:rgba(242,183,5,.2);display:grid;place-items:center;margin:0 auto 12px}
+  .gps-cta h3{font-size:16px;margin:0 0 6px}
+  .gps-cta p{font-size:12.5px;color:#B9C6DE;margin:0 0 14px;line-height:1.5}
+  .near-hero{background:linear-gradient(135deg,#1B9A6B,#15805a);color:#fff;border-radius:16px;padding:15px;margin-bottom:12px}
+  .near-hero .rl{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:#CFF3E4;font-weight:800}
+  .near-hero .rn{font-size:19px;font-weight:800;margin-top:4px;line-height:1.15}
+  .near-hero .sub{font-size:12px;color:#CFF3E4;margin-top:4px;font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="appbar">
+  <div class="logo">L</div>
+  <div>
+    <div class="tt">Bitácora de Puntos</div>
+    <div class="ss">Lotería Nacional · Quito</div>
+  </div>
+  <button class="gps" id="gpsBtn"><span class="led"></span><span id="gpsTxt">Ubicar</span></button>
+</div>
+
+<div class="views">
+  <!-- MAP -->
+  <section class="view map-view" id="v-map">
+    <div id="map"></div>
+    <div class="prog">
+      <div class="txt" id="progTxt">0 / 126</div>
+      <div class="bar"><i id="progBar"></i></div>
+      <div class="txt" id="progPct">0%</div>
+    </div>
+    <button class="locate" id="locateFab" title="Centrar en mi ubicación">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#14284B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </button>
+  </section>
+
+  <!-- LISTA -->
+  <section class="view hidden" id="v-list">
+    <input class="search" id="q" placeholder="Buscar punto o dirección…">
+    <div class="filters">
+      <button class="fchip on" data-f="todos">Todos</button>
+      <button class="fchip" data-f="pendiente">Pendientes</button>
+      <button class="fchip" data-f="visitado">Visitados</button>
+      <button class="fchip" data-f="novedad">Con novedad</button>
+      <button class="fchip" data-f="cerca">Más cercanos</button>
+    </div>
+    <div id="list"></div>
+  </section>
+
+  <!-- RUTA -->
+  <section class="view hidden" id="v-route">
+    <div class="lbl">Ruta del día</div>
+    <div id="routeHero"></div>
+    <div id="routeList"></div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="view hidden" id="v-set">
+    <div class="lbl">Resumen</div>
+    <div class="stat-grid">
+      <div class="stat"><b id="stTot">0</b><span>Total</span></div>
+      <div class="stat"><b id="stVis" style="color:var(--green)">0</b><span>Visitados</span></div>
+      <div class="stat"><b id="stNov" style="color:var(--red)">0</b><span>Novedades</span></div>
+    </div>
+    <div class="card" id="gpsHelp">
+      <h3>Cómo activar el GPS</h3>
+      <p>El navegador bloquea la ubicación si la app se abre como archivo (<b>file://</b> o <b>content://</b>, como desde el explorador). Necesita abrirse desde un enlace seguro. Opciones, de la más fácil a la más técnica:</p>
+      <p style="margin-bottom:6px"><b>1. Subirla a un hosting gratis (recomendado).</b> Arrastra este archivo a <b>app.netlify.com/drop</b> o súbelo a GitHub Pages. Te da un enlace <b>https://</b> que abres en Chrome y el GPS funciona. Ideal para el campo.</p>
+      <p style="margin-bottom:6px"><b>2. Servidor local en el teléfono.</b> Con Termux: <code>python3 -m http.server 8000</code> en la carpeta del archivo y abre <b>http://localhost:8000</b>. <b>localhost</b> cuenta como seguro, así que el GPS funciona 100% sin internet.</p>
+      <p style="margin-bottom:0"><b>3. En PC.</b> <code>python -m http.server</code> y ábrela en <b>http://localhost:8000</b>.</p>
+    </div>
+    <div class="card">
+      <h3>Reportes y respaldo</h3>
+      <p>Exporta tu avance o guarda un respaldo para no perder la bitácora.</p>
+      <button class="btn btn-ghost" id="expXls">Exportar a Excel</button>
+      <button class="btn btn-ghost" id="expPdf" style="margin-top:9px">Reporte para imprimir / PDF</button>
+      <button class="btn btn-ghost" id="expJson" style="margin-top:9px">Respaldo (.json)</button>
+      <label class="btn btn-ghost" style="margin-top:9px;display:block">Restaurar respaldo
+        <input type="file" id="impJson" accept="application/json" class="hidden"></label>
+    </div>
+    <div class="card">
+      <h3>Instalar en el teléfono</h3>
+      <p>Añádela a tu pantalla de inicio para abrirla como una app y trabajar sin conexión.</p>
+      <button class="btn btn-navy" id="installBtn">Instalar app</button>
+    </div>
+    <div class="card">
+      <h3>Zona de datos</h3>
+      <p>Reinicia todos los estados y notas (no borra los puntos). Esta acción no se puede deshacer.</p>
+      <button class="btn btn-ghost" id="resetBtn" style="color:var(--red)">Reiniciar bitácora</button>
+    </div>
+  </section>
+</div>
+
+<nav class="tabbar">
+  <button class="tab on" data-v="map"><svg class="ic" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>Mapa</button>
+  <button class="tab" data-v="list"><svg class="ic" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Lista</button>
+  <button class="tab" data-v="route"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M6 17V9a4 4 0 0 1 4-4h4M18 7v8a4 4 0 0 1-4 4h-4"/></svg>Ruta</button>
+  <button class="tab" data-v="set"><svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Más</button>
+</nav>
+
+<!-- Detail sheet -->
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <div class="sheet-head">
+    <div class="h" id="dName">—</div>
+    <div class="a" id="dAddr">—</div>
+  </div>
+  <div class="sheet-body" id="dBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* ---------- DATA ---------- */
+const PUNTOS = [{"id": 1, "nom": "Equinoccial", "code": "PDSLD EQUINOCCIAL, UIO, AV EQUINOCCIAL E3273", "dir": "XHR3+CHM Quito", "lat": -0.009, "lon": -78.446, "capa": "Locales"}, {"id": 2, "nom": "Pomasqui", "code": "PDSID POMASQUI, UIO", "dir": "WGXV+CHX Quito", "lat": -0.051, "lon": -78.456, "capa": "Locales"}, {"id": 3, "nom": "Bicentenario", "code": "PDSID BICENTENARIO, UIO", "dir": "WGJX+CGC Quito", "lat": -0.069, "lon": -78.451, "capa": "Locales"}, {"id": 4, "nom": "Carcelen", "code": "PDSLL CARCELEN, UIO", "dir": "WG5J+V6G Quito", "lat": -0.09, "lon": -78.469, "capa": "Locales"}, {"id": 5, "nom": "Coral Carapungo", "code": "PDSID CORAL CARAPUNGO, UIO", "dir": "WH6C+4PR Quito", "lat": -0.09, "lon": -78.428, "capa": "Locales"}, {"id": 6, "nom": "Av Vicente Paredes", "code": "PDVLD AV VICENTE PAREDES, OE4-195, UIO, AL", "dir": "WH6C+4PR Quito", "lat": -0.09, "lon": -78.428, "capa": "Locales"}, {"id": 7, "nom": "Coral Carapungo Esp", "code": "PDVID CORAL CARAPUNGO ESP#2, UIO", "dir": "WH6C+4PJ Quito", "lat": -0.09, "lon": -78.428, "capa": "Locales"}, {"id": 8, "nom": "Av Diego Vasquez", "code": "PDSLD AV DIEGO VASQUEZ, UIO", "dir": "WG5G+GF2 Quito", "lat": -0.091, "lon": -78.474, "capa": "Locales"}, {"id": 9, "nom": "Super Aki Cangahua", "code": "PDSLD SUPER AKI CANGAHUA, UIO", "dir": "San Francisco de Rumihurco Y N76A, 170134 Quito, Ecuador", "lat": -0.094, "lon": -78.498, "capa": "Locales"}, {"id": 10, "nom": "Plaza Marianitas", "code": "PDSIL PLAZA MARIANITAS, UIO, PB #12", "dir": "WH36+WQV, Capitán Giovanni Calles, Quito 170202", "lat": -0.095, "lon": -78.438, "capa": "Locales"}, {"id": 11, "nom": "La Planada", "code": "PDVLD LA PLANADA, UIO, AL", "dir": "WF3P+J7M, Quito 170134, Ecuador", "lat": -0.096, "lon": -78.514, "capa": "Locales"}, {"id": 12, "nom": "Carapungo", "code": "PDSLD CARAPUNGO, UIO", "dir": "Neptaly Godoy 14139, Quito 170204, Ecuador", "lat": -0.097, "lon": -78.451, "capa": "Locales"}, {"id": 13, "nom": "Cc Vaccari Plaza", "code": "PDSID CC VACCARI PLAZA, UIO, P. LUIS VACCARI PB LOCAL #5", "dir": "WG2W+RJ2 Quito", "lat": -0.098, "lon": -78.453, "capa": "Locales"}, {"id": 14, "nom": "Calderon", "code": "PDSLD CALDERON, UIO", "dir": "WH2H+G4P, Punin, Quito 170201, Ecuador", "lat": -0.099, "lon": -78.422, "capa": "Locales"}, {"id": 15, "nom": "Calle Punin Calderon", "code": "PDVLD CALLE PUNIN CALDERON, UIO, AL", "dir": "VHXG+RQM Quito", "lat": -0.1, "lon": -78.423, "capa": "Locales"}, {"id": 16, "nom": "Llano Chico", "code": "PDVLL LLANO CHICO, UIO", "dir": "San Mateo 164, Quito 170202, Ecuador", "lat": -0.102, "lon": -78.44, "capa": "Locales"}, {"id": 17, "nom": "Cc El Condado 2", "code": "PDSLL CC EL CONDADO 2, UIO, P4 #L420", "dir": "Av. de la Prensa 120, Quito 170301, Ecuador", "lat": -0.103, "lon": -78.49, "capa": "Locales"}, {"id": 18, "nom": "Cc El Condado 2 P3", "code": "PDSIL CC EL CONDADO 2, UIO P3 #BTL-729", "dir": "VGW5+CJ6 Quito", "lat": -0.104, "lon": -78.491, "capa": "Locales"}, {"id": 19, "nom": "Cc Gran Aki Carapungo", "code": "PDSID CC GRAN AKI CARAPUNGO, UIO, SS #1", "dir": "VGWW+FH8 Quito", "lat": -0.104, "lon": -78.454, "capa": "Locales"}, {"id": 20, "nom": "Angel Ludueña", "code": "PDSLD ANGEL LUDUEÑA, UIO", "dir": "VGW5+FC9 Quito", "lat": -0.104, "lon": -78.491, "capa": "Locales"}, {"id": 21, "nom": "Sta Maria Condado", "code": "PDSIL STA MARIA CONDADO, UIO", "dir": "VGV3+M2H Quito", "lat": -0.106, "lon": -78.497, "capa": "Locales"}, {"id": 22, "nom": "Cc Portal Shopping Express", "code": "PDSLL CC PORTAL SHOPPING EXPRESS, UIO", "dir": "VGRV+M24 Quito", "lat": -0.108, "lon": -78.457, "capa": "Locales"}, {"id": 23, "nom": "Cc Portal Shopping", "code": "PDSID CC PORTAL SHOPPING, UIO", "dir": "VGRR+JWC Quito", "lat": -0.108, "lon": -78.458, "capa": "Locales"}, {"id": 24, "nom": "La Florida", "code": "PDSLD LA FLORIDA, UIO", "dir": "VGP3+2XH Quito", "lat": -0.115, "lon": -78.495, "capa": "Locales"}, {"id": 25, "nom": "Sta María Ofelia", "code": "PDSID STA MARÍA OFELIA, UIO", "dir": "VGP5+3V2, Quito 170144, Ecuador", "lat": -0.115, "lon": -78.49, "capa": "Locales"}, {"id": 26, "nom": "Cotocollao", "code": "PDSLD COTOCOLLAO, 25 DE MAYO, UIO", "dir": "VGM2+VXQ Quito", "lat": -0.115, "lon": -78.498, "capa": "Locales"}, {"id": 27, "nom": "Cotocollao", "code": "PDSLL COTOCOLLAO, UIO", "dir": "Av. La Prensa y Rigoberto Heredia, Quito", "lat": -0.12161, "lon": -78.49412, "capa": "Islas + Locales"}, {"id": 28, "nom": "Real Audiencia", "code": "PDSLL REAL AUDIENCIA, UIO, AV. REAL AUDIENCIA N60-112", "dir": "VGF7+QFX Quito", "lat": -0.126, "lon": -78.486, "capa": "Locales"}, {"id": 29, "nom": "Cc Gran Aki Molineros", "code": "PDSID CC GRAN AKI MOLINEROS, UIO, SS", "dir": "VGCH+C3M Quito", "lat": -0.129, "lon": -78.472, "capa": "Locales"}, {"id": 30, "nom": "Comité Del Pueblo", "code": "PDSLD COMITÉ DEL PUEBLO, UIO, LOS NARDOS", "dir": "VGCH+FQM Quito", "lat": -0.129, "lon": -78.471, "capa": "Locales"}, {"id": 31, "nom": "San Isidro", "code": "PDSLD SAN ISIDRO, UIO", "dir": "VGCP+92M Quito", "lat": -0.129, "lon": -78.465, "capa": "Locales"}, {"id": 32, "nom": "Sup. Sta Maria Comité Del Pueblo", "code": "PDVIL SUP. STA MARIA COMITÉ DEL PUEBLO, UIO", "dir": "VGCH+C6P Quito", "lat": -0.129, "lon": -78.472, "capa": "Locales"}, {"id": 33, "nom": "Aki Molineros", "code": "PDVLD AKI MOLINEROS, JAZMINES, UIO", "dir": "Calle, Av. Juan Molineros E10-80, Quito 170138, Ecuador", "lat": -0.129, "lon": -78.472, "capa": "Locales"}, {"id": 34, "nom": "Parque Ingles", "code": "PDSID PARQUE INGLES, UIO", "dir": "Fernandez Salvador y Machala, Centro Comercial Ingles, Locales #29-35, Quito 170104, Ecuador", "lat": -0.134, "lon": -78.498, "capa": "Locales"}, {"id": 35, "nom": "Santa Maria Eden", "code": "PDSID SANTA MARIA EDEN, UIO", "dir": "VG7H+9HW Quito", "lat": -0.137, "lon": -78.471, "capa": "Locales"}, {"id": 36, "nom": "Megakiwy Eloy Alfaro", "code": "PDSID MEGAKIWY ELOY ALFARO, UIO, #02", "dir": "VG6J+Q73 Quito", "lat": -0.138, "lon": -78.469, "capa": "Locales"}, {"id": 37, "nom": "Kennedy", "code": "PDSLD KENNEDY, UIO, CAP. RAMON BORJA", "dir": "VG5F+WGP, Quito 170138, Ecuador", "lat": -0.14, "lon": -78.476, "capa": "Locales"}, {"id": 38, "nom": "Sup. Sta Maria Occidental", "code": "PDVIL SUP. STA MARIA OCCIDENTAL, UIO", "dir": "Av. Occidental &, Quito 170104, Ecuador", "lat": -0.144, "lon": -78.5, "capa": "Locales"}, {"id": 39, "nom": "Cc Plaza Aeropuerto", "code": "PDSLL CC PLAZA AEROPUERTO, UIO, PB LOCAL #6", "dir": "Centro Comercial Aeropuerto, Quito 170104, Ecuador", "lat": -0.145, "lon": -78.492, "capa": "Locales"}, {"id": 40, "nom": "Tia La Luz", "code": "PDSIL TIA LA LUZ, UIO, PB", "dir": "RGX8+VR8, Quito 170138, Ecuador", "lat": -0.15, "lon": -78.483, "capa": "Locales"}, {"id": 41, "nom": "Sup. Sta Maria La Luz", "code": "PDVIL SUP. STA MARIA LA LUZ, UIO", "dir": "VG29+4R6 Quito", "lat": -0.15, "lon": -78.48, "capa": "Locales"}, {"id": 42, "nom": "La Luz Av. Francisco", "code": "PDVLL LA LUZ AV. FRANCISCO, UIO", "dir": "RGX8+WH8 Quito", "lat": -0.15, "lon": -78.484, "capa": "Locales"}, {"id": 43, "nom": "El Inca", "code": "PDSLD EL INCA, UIO", "dir": "RGWG+67X Quito", "lat": -0.154, "lon": -78.474, "capa": "Locales"}, {"id": 44, "nom": "El Inca Express", "code": "PDSLL EL INCA EXPRESS, UIO", "dir": "RGVC+RM2 Quito", "lat": -0.155, "lon": -78.478, "capa": "Locales"}, {"id": 45, "nom": "Parque Diego De Topia", "code": "PDSLD PARQUE DIEGO DE TOPIA, UIO", "dir": "Oe3 90, Quito 170104, Ecuador", "lat": -0.156, "lon": -78.49, "capa": "Locales"}, {"id": 46, "nom": "Cc El Bosque", "code": "PDSLL CC EL BOSQUE, UIO, PB #049", "dir": "RGQ2+6WQ Quito", "lat": -0.162, "lon": -78.498, "capa": "Locales"}, {"id": 47, "nom": "Cc Elbosque", "code": "PDSID CC ELBOSQUE, UIO, P1 #5", "dir": "RGQ2+7Q5 Quito", "lat": -0.162, "lon": -78.498, "capa": "Locales"}, {"id": 48, "nom": "Sup. Sta Maria 6 Diciembre", "code": "PDVIL SUP. STA MARIA 6 DICIEMBRE, UIO", "dir": "RGQF+6FJ, Quito 170138, Ecuador", "lat": -0.162, "lon": -78.476, "capa": "Locales"}, {"id": 49, "nom": "Av Rio Coca", "code": "PDVLL AV RIO COCA, UIO", "dir": "RGQ8+5X4 Quito", "lat": -0.162, "lon": -78.483, "capa": "Locales"}, {"id": 50, "nom": "Supermaxi Eloy Alfaro", "code": "PDSID SUPERMAXI ELOY ALFARO, UIO, NO-1", "dir": "RGPM+G22 Quito", "lat": -0.164, "lon": -78.467, "capa": "Locales"}, {"id": 51, "nom": "Cc Riocentro 6 De Diciembre", "code": "PDSIL CC RIOCENTRO 6 DE DICIEMBRE, UIO, PA #1", "dir": "RGMF+5G3, Quito 170102, Ecuador", "lat": -0.167, "lon": -78.476, "capa": "Locales"}, {"id": 52, "nom": "Cc Granados Plaza", "code": "PDSLL CC GRANADOS PLAZA, UIO", "dir": "Av. de los Granados y Av. 6 de Diciembre, Quito", "lat": -0.16807, "lon": -78.47579, "capa": "Islas + Locales"}, {"id": 53, "nom": "Coral La Y", "code": "PDSIL CORAL LA Y, UIO", "dir": "RGJ7+56M Quito", "lat": -0.17, "lon": -78.487, "capa": "Locales"}, {"id": 54, "nom": "Edificio Ritz", "code": "PDVLD EDIFICIO RITZ, UIO, AL", "dir": "RGHF+P6J Quito", "lat": -0.171, "lon": -78.477, "capa": "Locales"}, {"id": 55, "nom": "Santa Maria Iñaquito", "code": "PDSID SANTA MARIA IÑAQUITO, UIO", "dir": "RGG7+X4V Quito", "lat": -0.173, "lon": -78.487, "capa": "Locales"}, {"id": 56, "nom": "Cc Ccnu", "code": "PDSID CC CCNU, UIO, PB #4 ISLA", "dir": "Blvr. Naciones Unidas 170201, Quito 170201, Ecuador", "lat": -0.175, "lon": -78.484, "capa": "Locales"}, {"id": 57, "nom": "Cc Plaza De Las Américas Av. República", "code": "PDVLL CC PLAZA DE LAS AMÉRICAS AV. REPÚBLICA, UIO", "dir": "Av. Naciones Unidas 427, Quito 170102, Ecuador", "lat": -0.175, "lon": -78.492, "capa": "Locales"}, {"id": 58, "nom": "Cc Quicentro Norte 1", "code": "PDSID CC QUICENTRO NORTE 1, UIO, P1 #ESP-012", "dir": "C.C. Quicentro Shopping, Isla K01, Av. Naciones Unidas, Quito 170102, Ecuador", "lat": -0.176, "lon": -78.48, "capa": "Locales"}, {"id": 59, "nom": "Quicentro Norte 2", "code": "PDSID QUICENTRO NORTE 2, UIO, PB", "dir": "RGFC+FQR Quito", "lat": -0.176, "lon": -78.478, "capa": "Locales"}, {"id": 60, "nom": "Sup. Sta. Maria Naciones Unidas", "code": "PDVIL SUP. STA. MARIA NACIONES UNIDAS, UIO", "dir": "RGF9+H2H Quito", "lat": -0.176, "lon": -78.482, "capa": "Locales"}, {"id": 61, "nom": "Cc El Caracol", "code": "PDVID CC EL CARACOL, UIO", "dir": "CC Caracol, Avenida Amazonas, N36-227, Quito 170135, Ecuador", "lat": -0.176, "lon": -78.486, "capa": "Locales"}, {"id": 62, "nom": "Cc Quicentro Norte", "code": "PDVID CC QUICENTRO NORTE, ESP-012-P1, UIO", "dir": "C.C. Quicentro Shopping, Av. Naciones Unidas 170505, Av. de los Shyris, Quito 170135, Ecuador", "lat": -0.176, "lon": -78.48, "capa": "Locales"}, {"id": 63, "nom": "Cc Quicentro Norte", "code": "PDSLL CC QUICENTRO NORTE, UIO, P1 #P2-009-010", "dir": "Av. Naciones Unidas y Seis de Diciembre, Quicentro Shopping, Quito", "lat": -0.17609, "lon": -78.47923, "capa": "Islas + Locales"}, {"id": 64, "nom": "Cc Cci", "code": "PDSLL CC CCI, UIO, S1 #A-12 LOCAL", "dir": "RGF8+326 Quito", "lat": -0.177, "lon": -78.485, "capa": "Locales"}, {"id": 65, "nom": "Cc Cci", "code": "PDSIL CC CCI, UIO, PB #Y-13 ISLA", "dir": "Av. Río Amazonas N36-152, Quito 170135, Ecuador", "lat": -0.177, "lon": -78.485, "capa": "Locales"}, {"id": 66, "nom": "Corea", "code": "PDSLL COREA, UIO, COREA 126", "dir": "RGF7+4FH, Quito 170135, Ecuador", "lat": -0.177, "lon": -78.486, "capa": "Locales"}, {"id": 67, "nom": "La Carolina", "code": "PDSLL LA CAROLINA, UIO", "dir": "Av. Amazonas y Juan Galíndez, Edif. Amazonas Park Torre B, PB Local 2B, Quito", "lat": -0.17901, "lon": -78.48639, "capa": "Islas + Locales"}, {"id": 68, "nom": "Mariana De Jesus", "code": "PDSLL MARIANA DE JESUS, UIO", "dir": "RG66+3JQ Quito", "lat": -0.19, "lon": -78.488, "capa": "Locales"}, {"id": 69, "nom": "Cc Mall El Jardin", "code": "PDSID CC MALL EL JARDIN, UIO, S1 #03", "dir": "RG67+42Q Quito", "lat": -0.19, "lon": -78.487, "capa": "Locales"}, {"id": 70, "nom": "La Pradera", "code": "PDVLL LA PRADERA, UIO", "dir": "Edificio María Victoria, Of. 202, Av. de la República, Quito 170517, Ecuador", "lat": -0.193, "lon": -78.485, "capa": "Locales"}, {"id": 71, "nom": "Av. Almagro Y Rep", "code": "PDVLL AV. ALMAGRO Y REP, UIO", "dir": "170518 Quito", "lat": -0.195, "lon": -78.484, "capa": "Locales"}, {"id": 72, "nom": "Cc Multicentro", "code": "PDSID CC MULTICENTRO, UIO, PB #1", "dir": "Av. 6 de Diciembre 50, Quito 170517, Ecuador", "lat": -0.199, "lon": -78.485, "capa": "Locales"}, {"id": 73, "nom": "Bingo Circasiana", "code": "PDSBD BINGO CIRCASIANA, UIO", "dir": "RG23+68P Quito", "lat": -0.199, "lon": -78.497, "capa": "Locales"}, {"id": 74, "nom": "Sta María Santa Clara", "code": "PDSID STA MARÍA SANTA CLARA, UIO", "dir": "Versalles &, Quito 170129, Ecuador", "lat": -0.201, "lon": -78.499, "capa": "Locales"}, {"id": 75, "nom": "Av. Cristobal Colon", "code": "PDVLL AV. CRISTOBAL COLON, UIO", "dir": "QGX6+GR5 Quito", "lat": -0.201, "lon": -78.488, "capa": "Locales"}, {"id": 76, "nom": "Plaza Foch", "code": "PDSLL PLAZA FOCH, UIO", "dir": "Reina Victoria E5-43, Quito 170524, Ecuador", "lat": -0.203, "lon": -78.491, "capa": "Locales"}, {"id": 77, "nom": "Mercury", "code": "PDSLL MERCURY, UIO", "dir": "Juan León Mera y Vicente, Quito", "lat": -0.2049, "lon": -78.49451, "capa": "Islas + Locales"}, {"id": 78, "nom": "Salesiana", "code": "PDSLL SALESIANA, UIO, AV 12 DE OCTUBRE N2413", "dir": "Av. 12 de Octubre 2413, Quito 170143, Ecuador", "lat": -0.207, "lon": -78.489, "capa": "Locales"}, {"id": 79, "nom": "Cc Scala Shopping 1", "code": "PDSIL CC SCALA SHOPPING 1, UIO", "dir": "Av. Interoceánica Km. 12½ y Pje. El Valle, Quito 170902, Ecuador", "lat": -0.208, "lon": -78.425, "capa": "Locales"}, {"id": 80, "nom": "Cc Ventura Mall", "code": "PDSID CC VENTURA MALL, UIO, PB", "dir": "Ventura Mall, Tercer nivel, local 46, Quito 170184, Ecuador", "lat": -0.211, "lon": -78.416, "capa": "Locales"}, {"id": 81, "nom": "Sta. Maria Tumbaco", "code": "PDSLL STA. MARIA TUMBACO, UIO, AV. INTEROCEANICA", "dir": "QHMV+QFW, Parqueadero C.C. Sta. María, Quito 170184, Ecuador", "lat": -0.216, "lon": -78.406, "capa": "Locales"}, {"id": 82, "nom": "Tejar", "code": "PDSLD TEJAR, UIO", "dir": "QFMM+J95 Quito", "lat": -0.216, "lon": -78.517, "capa": "Locales"}, {"id": 83, "nom": "Coral Tumbaco", "code": "PDSID CORAL TUMBACO, UIO", "dir": "QJM3+H9W, Av. Oswaldo Guayasamín, Quito 170184, Ecuador", "lat": -0.216, "lon": -78.397, "capa": "Locales"}, {"id": 84, "nom": "Sta. Maria Tumbaco", "code": "PDVIL STA. MARIA TUMBACO, UIO", "dir": "QHMV+JCV Quito", "lat": -0.216, "lon": -78.406, "capa": "Locales"}, {"id": 85, "nom": "Sta. Maria Tumbaco", "code": "PDVLL STA. MARIA TUMBACO, UIO", "dir": "QHMV+MCG Quito", "lat": -0.216, "lon": -78.406, "capa": "Locales"}, {"id": 86, "nom": "Plaza Del Teatro", "code": "PDVLL PLAZA DEL TEATRO, UIO", "dir": "QFJV+WC7 Quito", "lat": -0.218, "lon": -78.506, "capa": "Locales"}, {"id": 87, "nom": "Olmedo Express", "code": "PDSLL OLMEDO EXPRESS, UIO", "dir": "C. Guayaquil 752, Quito 170401, Ecuador", "lat": -0.219, "lon": -78.509, "capa": "Locales"}, {"id": 88, "nom": "Centro Historico", "code": "PDSLL CENTRO HISTORICO, UIO", "dir": "Chile y Guayaquil, Quito", "lat": -0.22067, "lon": -78.51056, "capa": "Islas + Locales"}, {"id": 89, "nom": "Distrito Comercial", "code": "PDSLD DISTRITO COMERCIAL, UIO, AV. PICHINCHA", "dir": "Av. Pichincha N4-145, Quito 170136, Ecuador", "lat": -0.224, "lon": -78.507, "capa": "Locales"}, {"id": 90, "nom": "Cc Coral Magdalena", "code": "PDSIL CC CORAL MAGDALENA, UIO, AV 5 DE JUNIO PB #2", "dir": "QF6G+MJF Quito", "lat": -0.238, "lon": -78.523, "capa": "Locales"}, {"id": 91, "nom": "Rodrigo De Chavez", "code": "PDSLL RODRIGO DE CHAVEZ, UIO, AV. RODRIGO DE CHAVEZ OE2-52", "dir": "QF5H+9GR Quito", "lat": -0.242, "lon": -78.521, "capa": "Locales"}, {"id": 92, "nom": "Sta Maria Villaflora", "code": "PDSID STA MARIA VILLAFLORA, UIO", "dir": "QF4J+7RH Quito", "lat": -0.244, "lon": -78.518, "capa": "Locales"}, {"id": 93, "nom": "Chilibulo", "code": "PDSLD CHILIBULO, UIO", "dir": "QF45+FXQ Quito", "lat": -0.244, "lon": -78.54, "capa": "Locales"}, {"id": 94, "nom": "La Michelena", "code": "PDVLL LA MICHELENA, S11-D, UIO", "dir": "QF28+GVX, Av. Michelena, Quito 170111, Ecuador", "lat": -0.249, "lon": -78.533, "capa": "Locales"}, {"id": 95, "nom": "Cc El Recreo", "code": "PDSID CC EL RECREO, UIO, P1 #I-3P005", "dir": "PFXH+P5J Quito", "lat": -0.251, "lon": -78.522, "capa": "Locales"}, {"id": 96, "nom": "Cc Atahualpa 30", "code": "PDSLL CC ATAHUALPA 30, UIO, LOCAL #30", "dir": "PFX7+G5R Quito", "lat": -0.251, "lon": -78.537, "capa": "Locales"}, {"id": 97, "nom": "Cc El Recreo (Happy Time)", "code": "PDSIL CC EL RECREO (HAPPY TIME), UIO, PB CORREDOR L # I-2L015", "dir": "PFXG+4P7 Quito", "lat": -0.252, "lon": -78.523, "capa": "Locales"}, {"id": 98, "nom": "Cc El Recreo 4", "code": "PDSIL CC EL RECREO 4, UIO, P1 CORREDOR H # I-1H019", "dir": "PFXH+438 Quito", "lat": -0.252, "lon": -78.522, "capa": "Locales"}, {"id": 99, "nom": "Cc El Recreo Etapa 2", "code": "PDSLL CC EL RECREO ETAPA 2, UIO", "dir": "PFWG+XMH Quito", "lat": -0.253, "lon": -78.523, "capa": "Locales"}, {"id": 100, "nom": "Sector Ajavi", "code": "PDSLD SECTOR AJAVI, UIO", "dir": "PFV6+5CC Quito", "lat": -0.257, "lon": -78.539, "capa": "Locales"}, {"id": 101, "nom": "Huigra", "code": "PDSLD HUIGRA, UIO", "dir": "PFR5+R93 Quito", "lat": -0.258, "lon": -78.542, "capa": "Locales"}, {"id": 102, "nom": "Sup. Sta Maria Biloxi", "code": "PDVIL SUP. STA MARIA BILOXI, UIO", "dir": "Av. Mariscal Sucre 569, Quito 170148, Ecuador", "lat": -0.258, "lon": -78.544, "capa": "Locales"}, {"id": 103, "nom": "Plaza Solanda", "code": "PDSID PLAZA SOLANDA, UIO", "dir": "PFJ6+V9R Quito", "lat": -0.268, "lon": -78.539, "capa": "Locales"}, {"id": 104, "nom": "La Armenia", "code": "PDSLD LA ARMENIA, UIO, SECTOR CONOCOTO", "dir": "Luis Felipe Borja 100y, Quito 170801, Ecuador", "lat": -0.269, "lon": -78.464, "capa": "Locales"}, {"id": 105, "nom": "Solanda", "code": "PDSLL SOLANDA, UIO", "dir": "PFJ5+398 Quito", "lat": -0.27, "lon": -78.542, "capa": "Locales"}, {"id": 106, "nom": "Sup. Sta. Maria Chillogallo", "code": "PDVIL SUP. STA. MARIA CHILLOGALLO, UIO", "dir": "PCCW+5QR Quito", "lat": -0.28, "lon": -78.553, "capa": "Locales"}, {"id": 107, "nom": "Chillogallo", "code": "PDSMN CHILLOGALLO, UIO", "dir": "PC9W+898 Quito", "lat": -0.282, "lon": -78.554, "capa": "Locales"}, {"id": 108, "nom": "Cc Quicentro Sur", "code": "PDSLL CC QUICENTRO SUR, UIO, PB #161-162", "dir": "105, Pedro Montero, Quito 170702", "lat": -0.285, "lon": -78.544, "capa": "Locales"}, {"id": 109, "nom": "Cc Quicentro Sur 1", "code": "PDSID CC QUICENTRO SUR 1, UIO, PB #PB-002", "dir": "PF74+MGX Quito", "lat": -0.286, "lon": -78.544, "capa": "Locales"}, {"id": 110, "nom": "Cc Quicentro Sur 2", "code": "PDSID CC QUICENTRO SUR 2, UIO, PB #PB-019", "dir": "PF75+G2M Quito", "lat": -0.286, "lon": -78.542, "capa": "Locales"}, {"id": 111, "nom": "Conocoto", "code": "PDSLD CONOCOTO, UIO, SIMON BOLIVAR E1-66", "dir": "Simón Bolívar E172, Quito, Ecuador", "lat": -0.292, "lon": -78.477, "capa": "Locales"}, {"id": 112, "nom": "Plataforma Gubernamental Sur", "code": "PDVLL PLATAFORMA GUBERNAMENTAL SUR, UIO", "dir": "PF43+VPF, Av. Amaru Ñan, Quito 170146, Ecuador", "lat": -0.293, "lon": -78.544, "capa": "Locales"}, {"id": 113, "nom": "Av. Garcia Moreno Conocoto", "code": "PDVLD AV. GARCIA MORENO CONOCOTO, UIO, AL", "dir": "PG4C+99R Quito", "lat": -0.294, "lon": -78.479, "capa": "Locales"}, {"id": 114, "nom": "San Gabriel", "code": "PDSLD SAN GABRIEL, UIO, AV. ILALÓ S4-8", "dir": "PG4X+36W Quito", "lat": -0.295, "lon": -78.452, "capa": "Locales"}, {"id": 115, "nom": "Martha Bucaram", "code": "PDSLL MARTHA BUCARAM, UIO", "dir": "PC2M+GVR Quito", "lat": -0.299, "lon": -78.565, "capa": "Locales"}, {"id": 116, "nom": "Plaza Del Valle Express", "code": "PDSLD PLAZA DEL VALLE EXPRESS, UIO", "dir": "MGXR+W5P Quito", "lat": -0.3, "lon": -78.46, "capa": "Locales"}, {"id": 117, "nom": "Sup. Sta Maria Quitumbe", "code": "PDVIL SUP. STA MARIA QUITUMBE, UIO", "dir": "MCXV+J3J Quito", "lat": -0.301, "lon": -78.557, "capa": "Locales"}, {"id": 118, "nom": "Doral", "code": "PDSLD DORAL, UIO", "dir": "MGVW+R22 Quito", "lat": -0.305, "lon": -78.455, "capa": "Locales"}, {"id": 119, "nom": "Cc San Luis", "code": "PDSLL CC SAN LUIS, UIO", "dir": "Av. Gral. Rumiñahui 108, Quito 170503, Ecuador", "lat": -0.308, "lon": -78.45, "capa": "Locales"}, {"id": 120, "nom": "Cc San Luis", "code": "PDSID CC SAN LUIS, UIO, P1", "dir": "Av. Gral. Rumiñahui 108, Quito 170503, Ecuador", "lat": -0.308, "lon": -78.45, "capa": "Locales"}, {"id": 121, "nom": "Santa Maria Panasur", "code": "PDSID SANTA MARIA PANASUR, UIO", "dir": "MFR4+Q9M Quito", "lat": -0.308, "lon": -78.544, "capa": "Locales"}, {"id": 122, "nom": "Sup. Sta. Maria Av. Ecuatoriana", "code": "PDVIL SUP. STA. MARIA AV. ECUATORIANA, UIO", "dir": "MCRP+3CX Quito", "lat": -0.31, "lon": -78.564, "capa": "Locales"}, {"id": 123, "nom": "Nueva Aurora", "code": "PDSID NUEVA AURORA, UIO", "dir": "MCJX+HHM Quito", "lat": -0.319, "lon": -78.551, "capa": "Locales"}, {"id": 124, "nom": "San Pedro", "code": "PDSLD SAN PEDRO, UIO", "dir": "Av. Mariana de Jesús 944, Quito, Ecuador", "lat": -0.321, "lon": -78.46, "capa": "Locales"}, {"id": 125, "nom": "Cc River Mall", "code": "PDSLD CC RIVER MALL, L13 PA, UIO", "dir": "VGM3+V2P Quito", "lat": -0.324, "lon": -78.449, "capa": "Locales"}, {"id": 126, "nom": "Agapanthus", "code": "PDSID AGAPANTHUS, UIO, VALLE DE LOS CHILLOS", "dir": "Río Napo y Huancavilca, Agapanthus, MG9C+29W, Quito, Ecuador", "lat": -0.332, "lon": -78.479, "capa": "Locales"}];
+
+/* ---------- STORAGE (IndexedDB → localStorage → memory) ---------- */
+const Store = (()=>{
+  let mem = {}; let mode='mem'; let db=null;
+  function openIDB(){return new Promise(res=>{
+    try{
+      const r = indexedDB.open('bitacora_quito',1);
+      r.onupgradeneeded=e=>{const d=e.target.result; if(!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');};
+      r.onsuccess=e=>{db=e.target.result; mode='idb'; res(true);};
+      r.onerror=()=>res(false);
+    }catch(e){res(false);}
+  });}
+  async function init(){
+    const ok = await openIDB();
+    if(!ok){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); mode='ls'; }catch(e){ mode='mem'; } }
+    return mode;
+  }
+  function idb(fn){return new Promise((res,rej)=>{const tx=db.transaction('kv',fn==='get'?'readonly':'readwrite');const s=tx.objectStore('kv');return res(s);});}
+  async function get(k){
+    if(mode==='idb') return new Promise(r=>{const s=db.transaction('kv','readonly').objectStore('kv');const q=s.get(k);q.onsuccess=()=>r(q.result??null);q.onerror=()=>r(null);});
+    if(mode==='ls'){const v=localStorage.getItem(k);return v?JSON.parse(v):null;}
+    return mem[k]??null;
+  }
+  async function set(k,v){
+    if(mode==='idb') return new Promise(r=>{const s=db.transaction('kv','readwrite').objectStore('kv');const q=s.put(v,k);q.onsuccess=()=>r(1);q.onerror=()=>r(0);});
+    if(mode==='ls'){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){toast('Almacenamiento lleno');}return;}
+    mem[k]=v;
+  }
+  async function del(k){
+    if(mode==='idb') return new Promise(r=>{const s=db.transaction('kv','readwrite').objectStore('kv');const q=s.delete(k);q.onsuccess=()=>r(1);q.onerror=()=>r(0);});
+    if(mode==='ls'){localStorage.removeItem(k);return;}
+    delete mem[k];
+  }
+  return {init,get,set,del,mode:()=>mode};
+})();
+
+/* ---------- STATE ---------- */
+let REC = {};          // id -> {status, notes:[], photos:[], last}
+let myPos = null;      // {lat,lon}
+let map, meMarker, markers={}, watchId=null;
+let curFilter='todos', curDetailId=null, draftTags=new Set(), deferredPrompt=null, gpsBlocked=false;
+
+const NOW = ()=>new Date();
+const fmt = d=>{const x=new Date(d);return x.toLocaleDateString('es-EC',{day:'2-digit',month:'short'})+' · '+x.toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});};
+const TAGS = ['Reabastecer','Sin novedad','Material dañado','Cerrado','Buen desempeño'];
+
+function rec(id){ if(!REC[id]) REC[id]={status:'pendiente',notes:[],photos:[],last:null}; return REC[id]; }
+async function saveRec(id){ await Store.set('pt:'+id, REC[id]); }
+
+/* ---------- GEO ---------- */
+function haversine(a,b){
+  const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180;
+  const s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+const kmTxt=k=> k<1? Math.round(k*1000)+' m' : k.toFixed(1).replace('.',',')+' km';
+
+function nearestPending(from, excludeId){
+  let best=null,bd=1e9;
+  for(const p of PUNTOS){
+    if(p.id===excludeId) continue;
+    if(rec(p.id).status==='visitado'||rec(p.id).status==='novedad') continue;
+    const d=haversine(from,p);
+    if(d<bd){bd=d;best=p;}
+  }
+  return best?{p:best,d:bd}:null;
+}
+function nearestListPending(from,n,excludeId){
+  return PUNTOS
+    .filter(p=>p.id!==excludeId && rec(p.id).status==='pendiente')
+    .map(p=>({p,d:haversine(from,p)}))
+    .sort((a,b)=>a.d-b.d)
+    .slice(0,n||8);
+}
+function optimizeRoute(from){
+  const pend=PUNTOS.filter(p=>rec(p.id).status==='pendiente');
+  const out=[]; let cur=from, pool=[...pend], total=0;
+  while(pool.length){
+    let bi=0,bd=1e9;
+    pool.forEach((p,i)=>{const d=haversine(cur,p);if(d<bd){bd=d;bi=i;}});
+    total+=bd; cur=pool[bi]; out.push({p:pool[bi],d:bd}); pool.splice(bi,1);
+  }
+  return {stops:out,total};
+}
+
+/* Google Maps deep link (navigation) */
+function navTo(p){
+  const dest=p.lat+','+p.lon;
+  const url='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(dest)+'&travelmode=driving';
+  window.open(url,'_blank');
+}
+
+/* ---------- GPS ---------- */
+let firstFix=false;
+function insecureMsg(){
+  return `El navegador bloquea el GPS cuando la app se abre como archivo (file:// o content://). Ábrela desde un enlace <b>https://</b> o <b>http://localhost</b> para activar la ubicación.`;
+}
+function startGPS(){
+  if(!navigator.geolocation){toast('Sin GPS disponible');return;}
+  if(!window.isSecureContext){
+    document.getElementById('gpsTxt').textContent='Sin HTTPS';
+    toast('El GPS necesita HTTPS — mira “Cómo activar el GPS” en Más');
+    gpsBlocked=true; refreshRoute();
+    return;
+  }
+  document.getElementById('gpsTxt').textContent='Buscando…';
+  watchId=navigator.geolocation.watchPosition(pos=>{
+    myPos={lat:pos.coords.latitude,lon:pos.coords.longitude};
+    document.getElementById('gpsBtn').classList.add('on');
+    document.getElementById('locateFab').classList.add('on');
+    document.getElementById('gpsTxt').textContent='GPS activo';
+    updateMe();
+    if(!firstFix){
+      firstFix=true;
+      if(map) map.setView([myPos.lat,myPos.lon],14);
+      curFilter='cerca';
+      document.querySelectorAll('.fchip').forEach(x=>x.classList.toggle('on',x.dataset.f==='cerca'));
+      toast('Ubicación lista · ordenando por cercanía');
+    }
+    if(curFilter==='cerca') renderList(); refreshRoute();
+  },err=>{
+    const msgs={1:'Permiso de ubicación denegado',2:'Ubicación no disponible',3:'El GPS tardó demasiado'};
+    document.getElementById('gpsTxt').textContent='Sin señal';
+    toast(msgs[err.code]||'No se pudo obtener la ubicación');
+  },{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+}
+function recenter(){
+  if(myPos&&map){ map.setView([myPos.lat,myPos.lon],15); }
+  else startGPS();
+}
+function updateMe(){
+  if(!map||!myPos)return;
+  if(!meMarker){meMarker=L.marker([myPos.lat,myPos.lon],{icon:L.divIcon({className:'',html:'<div class="me-dot"></div>',iconSize:[18,18],iconAnchor:[9,9]}),zIndexOffset:1000}).addTo(map);}
+  else meMarker.setLatLng([myPos.lat,myPos.lon]);
+}
+
+/* ---------- MAP ---------- */
+const STCOL={pendiente:'#E08A00',visitado:'#1B9A6B',novedad:'#B4381F'};
+function initMap(){
+  map=L.map('map',{zoomControl:false}).setView([-0.18,-78.49],12);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+  PUNTOS.forEach(p=>{
+    const m=L.marker([p.lat,p.lon],{icon:mkIcon(rec(p.id).status)}).addTo(map);
+    m.on('click',()=>openDetail(p.id));
+    markers[p.id]=m;
+  });
+}
+function mkIcon(st){
+  return L.divIcon({className:'mk',iconSize:[26,26],iconAnchor:[13,26],
+    html:`<div class="mkp"><i style="background:${STCOL[st]}"></i></div>`});
+}
+function refreshMarker(id){ if(markers[id]) markers[id].setIcon(mkIcon(rec(id).status)); }
+
+/* ---------- RENDER: LIST ---------- */
+function statusDot(st){return `<span class="dot ${st}"></span>`;}
+function renderList(){
+  const q=(document.getElementById('q').value||'').toLowerCase().trim();
+  let arr=PUNTOS.map(p=>({p,d:myPos?haversine(myPos,p):null}));
+  if(curFilter!=='todos'&&curFilter!=='cerca') arr=arr.filter(x=>rec(x.p.id).status===curFilter);
+  if(q) arr=arr.filter(x=>(x.p.nom+' '+x.p.dir+' '+x.p.code).toLowerCase().includes(q));
+  if(curFilter==='cerca'){ if(!myPos){toast('Activa el GPS para ordenar por cercanía');} arr.sort((a,b)=>(a.d??1e9)-(b.d??1e9)); }
+  const el=document.getElementById('list');
+  if(!arr.length){el.innerHTML='<div class="hint">Sin resultados.</div>';return;}
+  el.innerHTML=arr.map(({p,d})=>{
+    const st=rec(p.id).status;
+    return `<div class="item" onclick="openDetail(${p.id})">
+      ${statusDot(st)}
+      <div style="min-width:0">
+        <div class="nm">${esc(p.nom)}</div>
+        <div class="ad">${esc(shortAddr(p.dir))}</div>
+      </div>
+      <div class="rt">
+        ${d!=null?`<div class="km">${kmTxt(d)}</div>`:''}
+        <button class="goSm" onclick="event.stopPropagation();navTo(${jsp(p)})"><span class="pin"></span>Ir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function shortAddr(a){ return a.length>42? a.slice(0,40)+'…':a; }
+
+/* ---------- RENDER: RUTA ---------- */
+function refreshRoute(){
+  const hero=document.getElementById('routeHero'), list=document.getElementById('routeList');
+  // No GPS yet → clear call to action, do NOT anchor on a fixed point
+  if(!myPos){
+    if(gpsBlocked){
+      hero.innerHTML=`<div class="gps-cta">
+        <div class="ci"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#F2B705" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg></div>
+        <h3>GPS bloqueado por el navegador</h3>
+        <p>${insecureMsg()}</p>
+        <button class="btn btn-gold" onclick="show('set')" style="max-width:260px;margin:0 auto">Ver cómo activarlo</button>
+      </div>`;
+      list.innerHTML='';
+      return;
+    }
+    hero.innerHTML=`<div class="gps-cta">
+      <div class="ci"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#F2B705" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+      <h3>Activa tu ubicación</h3>
+      <p>Los puntos cercanos y la ruta se calculan desde donde estás parado en este momento.</p>
+      <button class="btn btn-gold" onclick="startGPS()" style="max-width:220px;margin:0 auto">Usar mi ubicación</button>
+    </div>`;
+    list.innerHTML='';
+    return;
+  }
+  const pendCount=PUNTOS.filter(p=>rec(p.id).status==='pendiente').length;
+  if(!pendCount){
+    hero.innerHTML=`<div class="near-hero"><div class="rl">Cercanos a ti</div><div class="rn">¡Todo cubierto! 🎉</div><div class="sub">No quedan puntos pendientes.</div></div>`;
+    list.innerHTML='<div class="hint">Puedes revisar los visitados en la Lista.</div>';return;
+  }
+  // Nearest pending to CURRENT position
+  const near=nearestListPending(myPos,8);
+  const first=near[0];
+  hero.innerHTML=`<div class="near-hero">
+    <div class="rl">Más cercano a tu ubicación</div>
+    <div class="rn">${esc(first.p.nom)}</div>
+    <div class="sub">${kmTxt(first.d)} · ${esc(shortAddr(first.p.dir))}</div>
+    <button class="btn btn-gold" style="margin-top:12px" onclick="navTo(${jsp(first.p)})">Navegar ahí con Google Maps</button>
+  </div>`;
+  // Full optimized chain from current position (secondary)
+  const {stops,total}=optimizeRoute(myPos);
+  list.innerHTML=
+    `<div class="lbl">Cercanos a ti ahora</div>`+
+    near.map(s=>rowItem(s,false)).join('')+
+    `<div class="lbl" style="margin-top:18px">Recorrido completo optimizado · ${pendCount} pts · ${total.toFixed(1).replace('.',',')} km</div>`+
+    stops.map((s,i)=>rowItem(s,true,i)).join('');
+}
+function rowItem(s,indexed,i){
+  return `<div class="item" onclick="openDetail(${s.p.id})" style="position:relative;overflow:visible">
+    ${indexed?`<span class="idx">${i+1}</span>`:''}
+    ${statusDot(rec(s.p.id).status)}
+    <div style="min-width:0"><div class="nm">${esc(s.p.nom)}</div><div class="ad">${esc(shortAddr(s.p.dir))}</div></div>
+    <div class="rt"><div class="km">${kmTxt(s.d)}</div>
+      <button class="goSm" onclick="event.stopPropagation();navTo(${jsp(s.p)})"><span class="pin"></span>Ir</button></div>
+  </div>`;
+}
+
+/* ---------- DETAIL SHEET ---------- */
+function openDetail(id){
+  curDetailId=id; draftTags=new Set();
+  const p=PUNTOS.find(x=>x.id===id), r=rec(id);
+  document.getElementById('dName').textContent=p.nom;
+  document.getElementById('dAddr').textContent=p.dir;
+  renderDetail();
+  document.getElementById('scrim').classList.add('show');
+  document.getElementById('sheet').classList.add('show');
+}
+function closeDetail(){
+  document.getElementById('scrim').classList.remove('show');
+  document.getElementById('sheet').classList.remove('show');
+  curDetailId=null;
+}
+function renderDetail(){
+  const id=curDetailId, p=PUNTOS.find(x=>x.id===id), r=rec(id);
+  let sug='';
+  if(r.status==='visitado'||r.status==='novedad'){
+    if(myPos){
+      const n=nearestPending(myPos,id);
+      if(n) sug=`<div class="suggest">
+        <div class="sl">Cercano a tu ubicación actual</div>
+        <div class="snm">${esc(n.p.nom)}</div>
+        <div class="skm">${kmTxt(n.d)} · ${esc(shortAddr(n.p.dir))}</div>
+        <div class="act2" style="margin-top:10px">
+          <button class="btn btn-green" onclick="navTo(${jsp(n.p)})">Navegar</button>
+          <button class="btn btn-ghost" onclick="openDetail(${n.p.id})">Abrir ficha</button>
+        </div></div>`;
+    } else {
+      sug=`<div class="suggest">
+        <div class="sl">Puntos cercanos</div>
+        <div class="skm" style="margin:4px 0 10px">Activa tu ubicación para ver el punto pendiente más cercano a donde estás.</div>
+        <button class="btn btn-gold" onclick="startGPS()">Usar mi ubicación</button></div>`;
+    }
+  }
+  const photos=r.photos.map((ph,i)=>`<div class="ph-wrap"><img src="${ph.dataUrl}"><button class="del" onclick="delPhoto(${i})">×</button></div>`).join('');
+  const hist=[...r.notes].reverse().map(n=>`
+    <div class="hrow"><div class="when">${fmt(n.ts)}</div>
+      <div class="what"><span class="st-in" style="color:${STCOL[n.status]||'#233'}">${cap(n.status||'nota')}</span>${n.text?' · '+esc(n.text):''}
+      ${(n.tags&&n.tags.length)?'<br><span class="tg">'+n.tags.map(esc).join(' · ')+'</span>':''}</div></div>`).join('')
+    || '<div class="hint" style="padding:12px">Aún no hay visitas registradas.</div>';
+
+  document.getElementById('dBody').innerHTML=`
+    ${sug}
+    <div class="statusrow">
+      ${['pendiente','visitado','novedad'].map(s=>`<button class="st ${s} ${r.status===s?'on':''}" onclick="setStatus('${s}')">${cap(s)}</button>`).join('')}
+    </div>
+    <div class="act2">
+      <button class="btn btn-navy" onclick="navTo(${jsp(p)})">Navegar (Google Maps)</button>
+      <button class="btn btn-gold" onclick="arrive()">Estoy aquí</button>
+    </div>
+    <div class="lbl">Nueva nota</div>
+    <textarea class="note" id="noteText" placeholder="¿Qué observaste en este punto?"></textarea>
+    <div class="tagrow">${TAGS.map(t=>`<button class="tag ${draftTags.has(t)?'on':''}" onclick="toggleTag('${t}')">${t}</button>`).join('')}</div>
+    <div class="photos">
+      ${photos}
+      <button class="addph" onclick="pickPhoto()">+</button>
+    </div>
+    <button class="btn btn-gold" onclick="saveNote()">Guardar nota</button>
+    <div class="lbl" style="margin-top:18px">Historial de visitas</div>
+    <div class="hist">${hist}</div>`;
+}
+function toggleTag(t){ draftTags.has(t)?draftTags.delete(t):draftTags.add(t); renderDetail(); }
+
+async function setStatus(s){
+  const r=rec(curDetailId); r.status=s; r.last=NOW().toISOString();
+  await saveRec(curDetailId); refreshMarker(curDetailId); renderDetail(); updateProgress(); toast('Estado: '+cap(s));
+}
+async function arrive(){
+  const r=rec(curDetailId);
+  if(r.status==='pendiente'){ r.status='visitado'; r.last=NOW().toISOString();
+    r.notes.push({ts:NOW().toISOString(),text:'',status:'visitado',tags:['Llegada registrada']});
+    await saveRec(curDetailId); refreshMarker(curDetailId); updateProgress(); }
+  renderDetail(); toast('Marcado como visitado'); refreshRoute();
+}
+async function saveNote(){
+  const r=rec(curDetailId); const txt=(document.getElementById('noteText').value||'').trim();
+  if(!txt && draftTags.size===0){toast('Escribe una nota o elige una etiqueta');return;}
+  r.notes.push({ts:NOW().toISOString(),text:txt,status:r.status,tags:[...draftTags]});
+  r.last=NOW().toISOString(); draftTags=new Set();
+  await saveRec(curDetailId); renderDetail(); toast('Nota guardada');
+}
+/* photos */
+function pickPhoto(){ document.getElementById('photoInput').click(); }
+document.getElementById('photoInput').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const reader=new FileReader();
+  reader.onload=async ()=>{
+    const img=new Image();
+    img.onload=async ()=>{
+      const c=document.createElement('canvas'); const scale=Math.min(1,900/Math.max(img.width,img.height));
+      c.width=img.width*scale; c.height=img.height*scale;
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      const data=c.toDataURL('image/jpeg',0.7);
+      rec(curDetailId).photos.push({ts:NOW().toISOString(),dataUrl:data});
+      await saveRec(curDetailId); renderDetail(); toast('Foto añadida');
+    };
+    img.src=reader.result;
+  };
+  reader.readAsDataURL(f); e.target.value='';
+});
+async function delPhoto(i){ rec(curDetailId).photos.splice(i,1); await saveRec(curDetailId); renderDetail(); }
+
+/* ---------- PROGRESS ---------- */
+function updateProgress(){
+  const vis=PUNTOS.filter(p=>['visitado','novedad'].includes(rec(p.id).status)).length;
+  const pct=Math.round(vis/PUNTOS.length*100);
+  document.getElementById('progTxt').textContent=vis+' / '+PUNTOS.length;
+  document.getElementById('progBar').style.width=pct+'%';
+  document.getElementById('progPct').textContent=pct+'%';
+  document.getElementById('stTot').textContent=PUNTOS.length;
+  document.getElementById('stVis').textContent=PUNTOS.filter(p=>rec(p.id).status==='visitado').length;
+  document.getElementById('stNov').textContent=PUNTOS.filter(p=>rec(p.id).status==='novedad').length;
+}
+
+/* ---------- EXPORTS ---------- */
+function exportXlsx(){
+  const rows=PUNTOS.map(p=>{const r=rec(p.id);const ln=r.notes.length?r.notes[r.notes.length-1]:null;return{
+    'N°':p.id,'Punto':p.nom,'Dirección':p.dir,'Estado':cap(r.status),
+    'Última visita':r.last?fmt(r.last):'','Última nota':ln?ln.text:'',
+    'Etiquetas':ln&&ln.tags?ln.tags.join(', '):'','Fotos':r.photos.length,'Lat':p.lat,'Lon':p.lon};});
+  const ws=XLSX.utils.json_to_sheet(rows); const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Bitácora'); XLSX.writeFile(wb,'bitacora_quito.xlsx'); toast('Excel generado');
+}
+function exportJson(){
+  const data={v:1,exported:NOW().toISOString(),rec:REC};
+  dl(new Blob([JSON.stringify(data)],{type:'application/json'}),'respaldo_bitacora.json'); toast('Respaldo descargado');
+}
+function importJson(file){
+  const rd=new FileReader(); rd.onload=async()=>{
+    try{const d=JSON.parse(rd.result); if(d.rec){REC=d.rec;
+      for(const id in REC) await Store.set('pt:'+id,REC[id]);
+      PUNTOS.forEach(p=>refreshMarker(p.id)); updateProgress(); renderList(); refreshRoute(); toast('Respaldo restaurado');}
+    }catch(e){toast('Archivo no válido');}
+  }; rd.readAsText(file);
+}
+function exportPdf(){
+  const vis=PUNTOS.filter(p=>rec(p.id).status==='visitado').length;
+  const nov=PUNTOS.filter(p=>rec(p.id).status==='novedad').length;
+  const rowsH=PUNTOS.map(p=>{const r=rec(p.id);const ln=r.notes.length?r.notes[r.notes.length-1]:null;
+    return `<tr><td>${p.id}</td><td>${esc(p.nom)}</td><td>${cap(r.status)}</td><td>${r.last?fmt(r.last):'—'}</td><td>${ln?esc(ln.text||(ln.tags||[]).join(', ')):''}</td></tr>`;}).join('');
+  const w=window.open('','_blank');
+  w.document.write(`<html><head><title>Reporte Bitácora</title><style>
+    body{font-family:Arial;margin:24px;color:#14284B}h1{font-size:18px}small{color:#666}
+    table{width:100%;border-collapse:collapse;margin-top:14px;font-size:11px}
+    th,td{border:1px solid #ccc;padding:5px 7px;text-align:left}th{background:#14284B;color:#fff}
+    .k{display:inline-block;margin-right:18px;font-weight:bold}</style></head><body>
+    <h1>Bitácora de Puntos de Venta — Quito</h1>
+    <small>Generado ${fmt(NOW())}</small><div style="margin-top:8px">
+    <span class="k">Total: ${PUNTOS.length}</span><span class="k" style="color:#1B9A6B">Visitados: ${vis}</span>
+    <span class="k" style="color:#B4381F">Novedades: ${nov}</span></div>
+    <table><thead><tr><th>N°</th><th>Punto</th><th>Estado</th><th>Última visita</th><th>Última nota</th></tr></thead>
+    <tbody>${rowsH}</tbody></table></body></html>`);
+  w.document.close(); setTimeout(()=>w.print(),400);
+}
+
+/* ---------- UTIL ---------- */
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
+function jsp(p){return JSON.stringify(p).replace(/"/g,'&quot;');}
+let toastT;
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200);}
+function dl(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+
+/* ---------- NAV ---------- */
+function show(v){
+  document.querySelectorAll('.view').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('v-'+v).classList.remove('hidden');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.v===v));
+  if(v==='map'&&map) setTimeout(()=>map.invalidateSize(),80);
+  if(v==='list') renderList();
+  if(v==='route') refreshRoute();
+}
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>show(t.dataset.v));
+document.getElementById('scrim').onclick=closeDetail;
+document.getElementById('gpsBtn').onclick=startGPS;
+document.getElementById('locateFab').onclick=recenter;
+document.getElementById('q').oninput=renderList;
+document.querySelectorAll('.fchip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('.fchip').forEach(x=>x.classList.remove('on'));c.classList.add('on');curFilter=c.dataset.f;renderList();});
+document.getElementById('expXls').onclick=exportXlsx;
+document.getElementById('expJson').onclick=exportJson;
+document.getElementById('expPdf').onclick=exportPdf;
+document.getElementById('impJson').onchange=e=>{if(e.target.files[0])importJson(e.target.files[0]);};
+document.getElementById('resetBtn').onclick=async()=>{
+  if(!confirm('¿Reiniciar todos los estados y notas?'))return;
+  for(const p of PUNTOS){await Store.del('pt:'+p.id);} REC={};
+  PUNTOS.forEach(p=>refreshMarker(p.id)); updateProgress(); renderList(); refreshRoute(); toast('Bitácora reiniciada');
+};
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;});
+document.getElementById('installBtn').onclick=async()=>{
+  if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null;}
+  else toast('Usa el menú del navegador → “Añadir a pantalla de inicio”');
+};
+
+/* ---------- PWA manifest (inline) ---------- */
+(function(){
+  const mani={name:'Bitácora de Puntos · Quito',short_name:'Bitácora',display:'standalone',
+    background_color:'#14284B',theme_color:'#14284B',start_url:'.',icons:[]};
+  const blob=new Blob([JSON.stringify(mani)],{type:'application/json'});
+  const l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(blob);document.head.appendChild(l);
+})();
+
+/* ---------- BOOT ---------- */
+(async function(){
+  await Store.init();
+  for(const p of PUNTOS){ const r=await Store.get('pt:'+p.id); if(r) REC[p.id]=r; }
+  initMap(); updateProgress(); renderList();
+  if(Store.mode()==='mem') toast('Vista previa: descarga el archivo para guardar tus datos');
+  // Ask for location right away so everything anchors on where you are
+  startGPS();
+})();
+</script>
+</body>
+</html>
